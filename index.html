@@ -1,0 +1,27 @@
+<html>
+	<head>
+		<title>Erdely.mbtiles</title>
+		<script type="text/javascript" src="modestmaps.min.js"></script>
+		<script type="text/javascript">
+			var MM = com.modestmaps;
+			var map;
+			function initMap() {
+				var layer = new MM.Layer(new MM.MapProvider(function(coord) {
+					var img = parseInt(coord.zoom) + '/' + parseInt(coord.column) + '/'+ parseInt(coord.row) + '.jpg';
+					return 'http://localhost:10998/tiles/' + img;
+				}))
+				map = new MM.Map('map', layer);
+				map.setCenterZoom(new MM.Location(46.3375, 25.285), 8);
+				map.setZoomRange(7,11);
+			}
+		</script>
+		<style>
+			body {margin: 0; }
+			#map { width: 100%; height:100%; }
+		</style>
+	</head>
+<body onload="initMap()">
+<div id="map">
+</div>
+</body>
+</html>
