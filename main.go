@@ -5,6 +5,7 @@ import (
 	"code.google.com/p/gosqlite/sqlite"
 	"code.google.com/p/freetype-go/freetype"
 	"code.google.com/p/freetype-go/freetype/truetype"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"image"
@@ -32,6 +33,7 @@ var tile_content_type string
 var db_modtime time.Time
 var db_conn *sqlite.Conn
 
+var db_metadata *Metadata
 var db_metadata_json []byte
 var emptytile []byte
 
@@ -50,33 +52,11 @@ func main() {
 	chk_fatal(err)
 	defer db_conn.Close()
 
-	stmt, err := db_conn.Prepare("select name,value from metadata")
-	chk_fatal(err)
-	err = stmt.Exec()
+	db_metadata, err = MbtMetadata(db_conn)
 	chk_fatal(err)
 
-	metadata := make(map[string]string)
-	for stmt.Next() {
-		var name, value string
-		err = stmt.Scan(&name, &value)
-		chk_fatal(err)
-		valjson := value
-		switch name {
-		case "bounds":
-			valjson = fields(value, "w", "s", "e", "n")
-		case "center":
-			valjson = fields(value, "x", "y", "z")
-		case "minzoom", "maxzoom":
-			// nothing to do
-		default:
-			valjson = `"` + stringescape(value) + `"`
-		}
-		jsonline := sep + `"` + name + `":` + valjson
-		sep = ",\n"
-		metadata.WriteString(jsonline)
-	}
-	metadata.WriteString("\n}")
-	db_metadata_json = metadata.Bytes()
+	db_metadata_json, err = json.Marshal(db_metadata)
+	chk_fatal(err)
 
 	im := image.NewRGBA(image.Rect(0,0,tilesize,tilesize))
 	var buf bytes.Buffer
@@ -90,30 +70,6 @@ func main() {
 	}))
 	err = http.ListenAndServe(*addr, nil)
 	chk_fatal(err)
-}
-
-func fields(s string, names ...string) string {
-	parts := strings.Split(s, ",")
-	res, sep := "{", ""
-	for i, name := range names {
-		res += sep + `"` + name + `":` + parts[i]
-		sep = ","
-	}
-	return res + "}"
-}
-
-func stringescape(s string) string {
-	res := ""
-	for {
-		n := strings.IndexAny(s, `\"`)
-		if n == -1 {
-			return res + s
-		}
-		part, esc := s[:n], `\` + s[n:n+1]
-		s = s[n:]
-		res += part + `\` + esc
-	}
-	return "" // not reached
 }
 
 var nstfont *truetype.Font

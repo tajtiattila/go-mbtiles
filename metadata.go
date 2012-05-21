@@ -33,7 +33,6 @@ func MbtMetadata(conn *sqlite.Conn) (*Metadata, error) {
 	}
 
 	md := new(Metadata)
-	sep := "{\n"
 	for stmt.Next() {
 		var name, value string
 		err = stmt.Scan(&name, &value)
@@ -51,7 +50,7 @@ func MbtMetadata(conn *sqlite.Conn) (*Metadata, error) {
 		case "maxzoom":
 			ve = fill(value, &md.MaxZoom)
 		default:
-			if rv := reflect.ValueOf(&md).FieldByName(strings.Title(name)); rv.Kind() == reflect.String {
+			if rv := reflect.ValueOf(md).Elem().FieldByName(strings.Title(name)); rv.Kind() == reflect.String {
 				rv.SetString(value)
 			}
 		}
