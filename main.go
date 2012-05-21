@@ -65,6 +65,7 @@ func main() {
 	emptytile = buf.Bytes()
 
 	http.Handle("/tiles/", http.StripPrefix("/tiles/", http.HandlerFunc(tiler)))
+	http.Handle("/", http.HandlerFunc(modestmaps))
 	http.Handle("/" + metadata_name, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		http.ServeContent(w, req, metadata_name, db_modtime, bytes.NewReader(db_metadata_json))
 	}))
