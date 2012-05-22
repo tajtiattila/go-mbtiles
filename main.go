@@ -29,6 +29,7 @@ func chk_fatal(err error) {
 var addr = flag.String("addr", ":10998", "http service address")
 var markmissing = flag.Bool("markmissing", false, "mark missing tiles")
 
+var modestmaps = flag.Bool("modestmaps", false, "serve modestmaps")
 var tile_content_type string
 var db_modtime time.Time
 var db_conn *sqlite.Conn
@@ -65,10 +66,12 @@ func main() {
 	emptytile = buf.Bytes()
 
 	http.Handle("/tiles/", http.StripPrefix("/tiles/", http.HandlerFunc(tiler)))
-	http.Handle("/", http.HandlerFunc(modestmaps))
 	http.Handle("/" + metadata_name, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		http.ServeContent(w, req, metadata_name, db_modtime, bytes.NewReader(db_metadata_json))
 	}))
+	if *modestmaps {
+		enable_modestmaps()
+	}
 	err = http.ListenAndServe(*addr, nil)
 	chk_fatal(err)
 }
