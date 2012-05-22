@@ -2,9 +2,9 @@ package main
 
 import (
 	"bytes"
-	"code.google.com/p/gosqlite/sqlite"
 	"code.google.com/p/freetype-go/freetype"
 	"code.google.com/p/freetype-go/freetype/truetype"
+	"code.google.com/p/gosqlite/sqlite"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -62,16 +62,18 @@ func main() {
 	db_metadata_json, err = json.Marshal(db_metadata)
 	chk_fatal(err)
 
-	im := image.NewRGBA(image.Rect(0,0,tilesize,tilesize))
+	im := image.NewRGBA(image.Rect(0, 0, tilesize, tilesize))
 	var buf bytes.Buffer
 	err = png.Encode(&buf, im)
 	chk_fatal(err)
 	emptytile = buf.Bytes()
 
 	http.Handle("/tiles/", http.StripPrefix("/tiles/", http.HandlerFunc(tiler)))
-	http.Handle("/" + metadata_name, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		http.ServeContent(w, req, metadata_name, db_modtime, bytes.NewReader(db_metadata_json))
-	}))
+	http.Handle("/"+metadata_name, http.HandlerFunc(
+		func(w http.ResponseWriter, req *http.Request) {
+			http.ServeContent(w, req, metadata_name,
+				db_modtime, bytes.NewReader(db_metadata_json))
+		}))
 	if *modestmaps {
 		enable_modestmaps()
 	}
@@ -114,8 +116,8 @@ func nosuchtile(v ...interface{}) []byte {
 			return nil
 		}
 	}
-	im := image.NewRGBA(image.Rect(0,0,tilesize,tilesize))
-	col := color.RGBA{tilesize-1,0,0,tilesize-1}
+	im := image.NewRGBA(image.Rect(0, 0, tilesize, tilesize))
+	col := color.RGBA{tilesize - 1, 0, 0, tilesize - 1}
 	for i := 0; i < tilesize; i++ {
 		im.Set(i, 0, col)
 		im.Set(i, tilesize-1, col)
@@ -130,7 +132,7 @@ func nosuchtile(v ...interface{}) []byte {
 	ctx.SetDst(im)
 	ctx.SetSrc(image.Black)
 	for i, n := range v {
-		_, err := ctx.DrawString(fmt.Sprint(n), freetype.Pt(30, 30 + i*20))
+		_, err := ctx.DrawString(fmt.Sprint(n), freetype.Pt(30, 30+i*20))
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -156,11 +158,11 @@ func tiler(w http.ResponseWriter, req *http.Request) {
 			args[i], err = strconv.Atoi(s)
 			if err != nil {
 				fmt.Println("Bad request", parts)
-				http.Error(w, "Bad request", 404)
+				http.Error(w, "Bad request", http.StatusNotFound)
 				return
 			}
 		}
-		args[2] = (1<<uint(args[0]))-1 - args[2]
+		args[2] = (1 << uint(args[0])) - 1 - args[2]
 		stmt, err := db_conn.Prepare(`select tile_data from tiles
 where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
 		var blob []byte
@@ -183,5 +185,5 @@ where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
 		return
 	}
 	fmt.Println(req.URL.Path)
-	http.Error(w, req.URL.Path+" not found", 500)
+	http.Error(w, req.URL.Path+" not found", http.StatusInternalServerError)
 }
