@@ -9,7 +9,7 @@ serving the tiles from the mbtiles sqlite database.
 External dependencies
 =====================
 
-[gostlite|http://code.google.com/p/gosqlite/]
+gostlite_::
 
     go get http://code.google.com/p/gosqlite
 
@@ -20,3 +20,4 @@ Todo
 - Search?
 
 
+.. _gostlite: http://code.google.com/p/gosqlite/
