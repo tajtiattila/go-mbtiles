@@ -31,6 +31,7 @@ var addr = flag.String("addr", ":10998", "http service address")
 var markmissing = flag.Bool("markmissing", false, "mark missing tiles")
 
 var modestmaps = flag.Bool("modestmaps", false, "serve modestmaps")
+var leaflet = flag.String("leaflet", "", "serve leaflet with path to its dist folder")
 var serve = flag.String("serve", "", "additional paths to serve")
 
 var tile_content_type string
@@ -46,6 +47,11 @@ const metadata_name = "metadata.json"
 
 func main() {
 	flag.Parse()
+	if *modestmaps && *leaflet != "" {
+		fmt.Println("options -modestmaps and -leaflet are mutually exclusive")
+		os.Exit(1)
+	}
+
 	dbname := flag.Arg(0)
 	fi, err := os.Stat(dbname)
 	chk_fatal(err)
@@ -76,6 +82,8 @@ func main() {
 		}))
 	if *modestmaps {
 		enable_modestmaps()
+	} else if *leaflet != "" {
+		enable_leaflet(*leaflet)
 	}
 
 	if *serve != "" {
