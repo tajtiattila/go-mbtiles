@@ -70,7 +70,9 @@ var leaflettext = `<html>
 		</script>
 		<style>
 			body {margin: 0; }
-			#map { width: 100%; height:100%; }
+			#map { width: 100%; height:100%;
+				background:#eee url(/images/bg.png);
+			}
 		</style>
 	</head>
 <body onload="initMap()">

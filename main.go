@@ -81,8 +81,10 @@ func main() {
 				db_modtime, bytes.NewReader(db_metadata_json))
 		}))
 	if *modestmaps {
+		enable_bgimg()
 		enable_modestmaps()
 	} else if *leaflet != "" {
+		enable_bgimg()
 		enable_leaflet(*leaflet)
 	}
 
@@ -125,7 +127,7 @@ func nosuchtile(v ...interface{}) []byte {
 		}
 	}
 	im := image.NewRGBA(image.Rect(0, 0, tilesize, tilesize))
-	col := color.RGBA{tilesize - 1, 0, 0, tilesize - 1}
+	col := color.RGBA{255, 0, 0, 255}
 	for i := 0; i < tilesize; i++ {
 		im.Set(i, 0, col)
 		im.Set(i, tilesize-1, col)
