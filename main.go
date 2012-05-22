@@ -14,6 +14,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,8 @@ var addr = flag.String("addr", ":10998", "http service address")
 var markmissing = flag.Bool("markmissing", false, "mark missing tiles")
 
 var modestmaps = flag.Bool("modestmaps", false, "serve modestmaps")
+var serve = flag.String("serve", "", "additional paths to serve")
+
 var tile_content_type string
 var db_modtime time.Time
 var db_conn *sqlite.Conn
@@ -71,6 +74,26 @@ func main() {
 	}))
 	if *modestmaps {
 		enable_modestmaps()
+	}
+
+	if *serve != "" {
+		for _, entry := range strings.Split(*serve, ",") {
+			v := strings.SplitN(entry, ":", 2)
+			var mapping, source string
+			if len(v) == 2 {
+				mapping, source = v[0], v[1]
+			} else {
+				mapping, source = path.Base(entry), entry
+			}
+			if mapping[0] != '/' {
+				mapping = "/" + mapping
+			}
+			if mapping[len(mapping)-1] != '/' {
+				mapping = mapping + "/"
+			}
+			http.Handle(mapping, http.StripPrefix(mapping, http.FileServer(http.Dir(source))))
+			fmt.Printf("serving: %s -> %s\n", mapping, source)
+		}
 	}
 	err = http.ListenAndServe(*addr, nil)
 	chk_fatal(err)
