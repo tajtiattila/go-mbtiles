@@ -15,6 +15,7 @@ type MBTiles struct {
 	Mtime    time.Time
 	mtx      sync.Mutex
 	conn     *sqlite.Conn
+	done     chan<- bool
 }
 
 func OpenMBTiles(dbname string) (*MBTiles, error) {
@@ -35,7 +36,47 @@ func OpenMBTiles(dbname string) (*MBTiles, error) {
 func (mbt *MBTiles) Close() error {
 	mbt.mtx.Lock()
 	defer mbt.mtx.Unlock()
-	return mbt.conn.Close()
+	if mbt.done != nil {
+		mbt.done <- true
+	}
+	err := mbt.conn.Close()
+	mbt.conn = nil
+	return err
+}
+
+func (mbt *MBTiles) AutoReload() {
+	mbt.mtx.Lock()
+	defer mbt.mtx.Unlock()
+	if mbt.done != nil {
+		return
+	}
+	ch := make(chan bool)
+	mbt.done = ch
+
+	go func() {
+		tick := time.Tick(time.Second)
+		for {
+			select {
+			case <-ch:
+				return
+			case <-tick:
+				fi, err := os.Stat(mbt.Filename)
+				if err != nil && fi.ModTime() != mbt.Mtime {
+					mbt.mtx.Lock()
+					// check if we were closed in the meantime
+					if mbt.conn != nil {
+						nconn, err := sqlite.Open(mbt.Filename)
+						if err == nil {
+							mbt.conn.Close()
+							mbt.Mtime = fi.ModTime()
+							mbt.conn = nconn
+						}
+					}
+					mbt.mtx.Unlock()
+				}
+			}
+		}
+	}()
 }
 
 func (mbt *MBTiles) GetTile(z, x, y int) ([]byte, error) {

@@ -46,6 +46,7 @@ func main() {
 	mbt, err = OpenMBTiles(flag.Arg(0))
 	chk_fatal(err)
 	defer mbt.Close()
+	mbt.AutoReload()
 
 	db_metadata, err = mbt.Metadata()
 	chk_fatal(err)
