@@ -2,16 +2,10 @@ package main
 
 import (
 	"bytes"
-	"code.google.com/p/freetype-go/freetype"
-	"code.google.com/p/freetype-go/freetype/truetype"
 	"code.google.com/p/gosqlite/sqlite"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"image"
-	"image/color"
-	"image/png"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -40,7 +34,6 @@ var db_conn *sqlite.Conn
 
 var db_metadata *Metadata
 var db_metadata_json []byte
-var emptytile []byte
 
 const tilesize = 256
 const metadata_name = "metadata.json"
@@ -67,12 +60,6 @@ func main() {
 
 	db_metadata_json, err = json.Marshal(db_metadata)
 	chk_fatal(err)
-
-	im := image.NewRGBA(image.Rect(0, 0, tilesize, tilesize))
-	var buf bytes.Buffer
-	err = png.Encode(&buf, im)
-	chk_fatal(err)
-	emptytile = buf.Bytes()
 
 	http.Handle("/tiles/", http.StripPrefix("/tiles/", http.HandlerFunc(tiler)))
 	http.Handle("/"+metadata_name, http.HandlerFunc(
@@ -109,50 +96,6 @@ func main() {
 	}
 	err = http.ListenAndServe(*addr, nil)
 	chk_fatal(err)
-}
-
-var nstfont *truetype.Font
-
-func nosuchtile(v ...interface{}) []byte {
-	if nstfont == nil {
-		data, err := ioutil.ReadFile("luxisr.ttf")
-		if err != nil {
-			fmt.Println(err)
-			return nil
-		}
-		nstfont, err = freetype.ParseFont(data)
-		if err != nil {
-			fmt.Println(err)
-			return nil
-		}
-	}
-	im := image.NewRGBA(image.Rect(0, 0, tilesize, tilesize))
-	col := color.RGBA{255, 0, 0, 255}
-	for i := 0; i < tilesize; i++ {
-		im.Set(i, 0, col)
-		im.Set(i, tilesize-1, col)
-		im.Set(0, i, col)
-		im.Set(tilesize-1, i, col)
-	}
-	ctx := freetype.NewContext()
-	ctx.SetDPI(72)
-	ctx.SetFont(nstfont)
-	ctx.SetFontSize(16)
-	ctx.SetClip(im.Bounds())
-	ctx.SetDst(im)
-	ctx.SetSrc(image.Black)
-	for i, n := range v {
-		_, err := ctx.DrawString(fmt.Sprint(n), freetype.Pt(30, 30+i*20))
-		if err != nil {
-			fmt.Println(err)
-		}
-	}
-	var buf bytes.Buffer
-	err := png.Encode(&buf, im)
-	if err != nil {
-		fmt.Println(err)
-	}
-	return buf.Bytes()
 }
 
 func tiler(w http.ResponseWriter, req *http.Request) {
