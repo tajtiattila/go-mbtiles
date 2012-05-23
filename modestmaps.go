@@ -15,7 +15,7 @@ func enable_modestmaps() error {
 	}
 	http.Handle("/", http.HandlerFunc(
 		func(w http.ResponseWriter, req *http.Request) {
-			metadata, err := MbtMetadata(db_conn)
+			metadata, err := mbt.Metadata()
 			if err != nil {
 				http.Error(w, "metadata query error: "+err.Error(), 500)
 				return

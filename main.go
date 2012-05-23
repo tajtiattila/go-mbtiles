@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"code.google.com/p/gosqlite/sqlite"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"time"
 )
 
 func chk_fatal(err error) {
@@ -29,8 +27,7 @@ var leaflet = flag.String("leaflet", "", "serve leaflet with path to its dist fo
 var serve = flag.String("serve", "", "additional paths to serve")
 
 var tile_content_type string
-var db_modtime time.Time
-var db_conn *sqlite.Conn
+var mbt *MBTiles
 
 var db_metadata *Metadata
 var db_metadata_json []byte
@@ -45,17 +42,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	dbname := flag.Arg(0)
-	fi, err := os.Stat(dbname)
+	var err error
+	mbt, err = OpenMBTiles(flag.Arg(0))
 	chk_fatal(err)
-	db_modtime = fi.ModTime()
-	db_modtime = time.Time{}
+	defer mbt.Close()
 
-	db_conn, err = sqlite.Open(dbname)
-	chk_fatal(err)
-	defer db_conn.Close()
-
-	db_metadata, err = MbtMetadata(db_conn)
+	db_metadata, err = mbt.Metadata()
 	chk_fatal(err)
 
 	db_metadata_json, err = json.Marshal(db_metadata)
@@ -65,7 +57,7 @@ func main() {
 	http.Handle("/"+metadata_name, http.HandlerFunc(
 		func(w http.ResponseWriter, req *http.Request) {
 			http.ServeContent(w, req, metadata_name,
-				db_modtime, bytes.NewReader(db_metadata_json))
+				mbt.Mtime, bytes.NewReader(db_metadata_json))
 		}))
 	if *modestmaps {
 		enable_bgimg()
@@ -116,16 +108,12 @@ func tiler(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 		args[2] = (1 << uint(args[0])) - 1 - args[2]
-		stmt, err := db_conn.Prepare(`select tile_data from tiles
-where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
-		var blob []byte
-		if err == nil {
-			err = stmt.Exec(args[0], args[1], args[2])
-			if err == nil && stmt.Next() {
-				err = stmt.Scan(&blob)
-			}
-		}
+		blob, err := mbt.GetTile(args[0], args[1], args[2])
 		if blob == nil {
+			if err != ErrTileNotFound {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			fmt.Println("notile", args[0], args[1], args[2])
 			if *markmissing {
 				blob = nosuchtile("no such tile", args[0], args[1], args[2])
@@ -134,7 +122,7 @@ where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
 			}
 		}
 		content := bytes.NewReader(blob)
-		http.ServeContent(w, req, "", db_modtime, content)
+		http.ServeContent(w, req, "", mbt.Mtime, content)
 		return
 	}
 	fmt.Println(req.URL.Path)
