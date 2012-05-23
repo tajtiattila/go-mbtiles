@@ -15,11 +15,11 @@ type MbtCenter struct {
 	Lon, Lat, Zoom float64
 }
 type Metadata struct {
-	Bounds MbtBounds
-	Center MbtCenter
-	MinZoom, MaxZoom int
+	Bounds                                                    MbtBounds
+	Center                                                    MbtCenter
+	MinZoom, MaxZoom                                          int
 	Name, Description, Attribution, Legend, Template, Version string
-	Errors []error
+	Errors                                                    []error
 }
 
 func MbtMetadata(conn *sqlite.Conn) (*Metadata, error) {
@@ -62,7 +62,7 @@ func MbtMetadata(conn *sqlite.Conn) (*Metadata, error) {
 }
 
 func fill(s string, v ...interface{}) []error {
-	ve := make([]error,0,len(v))
+	ve := make([]error, 0, len(v))
 	parts := strings.Split(s, ",")
 	for i := range v {
 		part, rv := parts[i], reflect.ValueOf(v[i]).Elem()
@@ -82,9 +82,8 @@ func fill(s string, v ...interface{}) []error {
 				ve = append(ve, err)
 			}
 		default:
-			ve = append(ve, errors.New("unknown type in fill: " + rv.Kind().String()))
+			ve = append(ve, errors.New("unknown type in fill: "+rv.Kind().String()))
 		}
 	}
 	return ve
 }
-
