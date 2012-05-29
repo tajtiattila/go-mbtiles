@@ -108,16 +108,18 @@ func tiler(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 		}
-		args[2] = (1 << uint(args[0])) - 1 - args[2]
-		blob, err := mbt.GetTile(args[0], args[1], args[2])
+		z, x, y := args[0], args[1], args[2]
+		// Flip Y coordinate because MBTiles files are TMS
+		y = (1 << uint(z)) - 1 - y
+		blob, err := mbt.GetTile(z, x, y)
 		if blob == nil {
 			if err != ErrTileNotFound {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			fmt.Println("notile", args[0], args[1], args[2])
+			fmt.Println("notile", z, x, y)
 			if *markmissing {
-				blob = nosuchtile("no such tile", args[0], args[1], args[2])
+				blob = nosuchtile("no such tile", z, x, y)
 			} else {
 				blob = emptytile
 			}
