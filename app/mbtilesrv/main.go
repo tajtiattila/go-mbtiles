@@ -22,6 +22,7 @@ func chk_fatal(err error) {
 
 var addr = flag.String("addr", ":10998", "http service address")
 var markmissing = flag.Bool("markmissing", false, "mark missing tiles")
+var gridderlog = flag.Bool("gridderlog", false, "log UTFGrid accesses")
 
 var modestmaps = flag.Bool("modestmaps", false, "serve modestmaps")
 var leaflet = flag.String("leaflet", "", "serve leaflet with path to its dist folder")
@@ -112,7 +113,9 @@ func tiler(w http.ResponseWriter, req *http.Request, z, x, y int) error {
 }
 
 func gridder(w http.ResponseWriter, req *http.Request, z, x, y int) error {
-	log.Println("gridder", req.URL)
+	if *gridderlog {
+		log.Println("gridder", req.URL)
+	}
 	blob, err := mbt.GetGridData(z, x, y, req.URL.Query().Get("callback"))
 	if err == nil {
 		http.ServeContent(w, req, "grid.js", time.Time{}, bytes.NewReader(blob))
