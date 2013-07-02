@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/tajtiattila/go-mbtiles/mbtiles"
 	"io"
 )
 
@@ -19,11 +20,8 @@ type MapData struct {
 	Legend string `json:"legend"`
 }
 
-func TileJson(mbtiles *MBTiles, callback string) (io.ReadSeeker, error) {
-	md, err := mbtiles.Metadata()
-	if err != nil {
-		return nil, err
-	}
+func TileJson(mbt *mbtiles.Map, callback string) (io.ReadSeeker, error) {
+	md := mbt.Metadata()
 
 	mapdata := &MapData{
 		"1.0.0",
@@ -42,7 +40,7 @@ func TileJson(mbtiles *MBTiles, callback string) (io.ReadSeeker, error) {
 	if callback != "" {
 		buf.WriteString(callback + "(")
 	}
-	if err = json.NewEncoder(&buf).Encode(mapdata); err != nil {
+	if err := json.NewEncoder(&buf).Encode(mapdata); err != nil {
 		return nil, err
 	}
 	if callback != "" {

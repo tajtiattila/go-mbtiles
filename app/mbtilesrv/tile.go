@@ -8,7 +8,6 @@ import (
 	"image"
 	"image/color"
 	"image/png"
-	"io/ioutil"
 )
 
 var emptytile []byte
@@ -23,21 +22,14 @@ func init() {
 		panic(err)
 	}
 	emptytile = buf.Bytes()
+
+	nstfont, err = freetype.ParseFont(luxiSansFontData())
+	if err != nil {
+		panic(err)
+	}
 }
 
 func nosuchtile(v ...interface{}) []byte {
-	if nstfont == nil {
-		data, err := ioutil.ReadFile("luxisr.ttf")
-		if err != nil {
-			fmt.Println(err)
-			return nil
-		}
-		nstfont, err = freetype.ParseFont(data)
-		if err != nil {
-			fmt.Println(err)
-			return nil
-		}
-	}
 	im := image.NewRGBA(image.Rect(0, 0, tilesize, tilesize))
 	col := color.RGBA{255, 0, 0, 255}
 	for i := 0; i < tilesize; i++ {

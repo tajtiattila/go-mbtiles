@@ -1,4 +1,4 @@
-package main
+package mbtiles
 
 import (
 	"database/sql"
@@ -22,7 +22,7 @@ type Metadata struct {
 	Errors                                                    []error
 }
 
-func MbtMetadata(db *sql.DB) (*Metadata, error) {
+func mbtMetadata(db *sql.DB) (*Metadata, error) {
 	rows, err := db.Query("select name,value from metadata")
 	if err != nil {
 		return nil, err

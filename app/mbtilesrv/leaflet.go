@@ -1,17 +1,18 @@
 package main
 
 import (
+	"github.com/tajtiattila/go-mbtiles/mbtiles"
 	"html/template"
 	"net/http"
 	"net/url"
 )
 
 type leafletparams struct {
-	M       *Metadata
+	M       *mbtiles.Metadata
 	Leaflet string
 }
 
-func enable_leaflet(mbtiles *MBTiles, libpath string) error {
+func enable_leaflet(mbt *mbtiles.Map, libpath string) error {
 	leaflettmpl, err := template.New("leaflettmpl").Parse(leaflettext)
 	if err != nil {
 		return err
@@ -29,12 +30,8 @@ func enable_leaflet(mbtiles *MBTiles, libpath string) error {
 	}
 	http.Handle("/", http.HandlerFunc(
 		func(w http.ResponseWriter, req *http.Request) {
-			metadata, err := mbtiles.Metadata()
-			if err != nil {
-				http.Error(w, "metadata query error: "+err.Error(), 500)
-				return
-			}
-			err = leaflettmpl.Execute(w, leafletparams{metadata, libpath})
+			metadata := mbt.Metadata()
+			err := leaflettmpl.Execute(w, leafletparams{metadata, libpath})
 			if err != nil {
 				http.Error(w, "template error: "+err.Error(), 500)
 			}

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"github.com/tajtiattila/go-mbtiles/mbtiles"
 	"io"
 	"log"
 	"net/http"
@@ -28,7 +29,7 @@ var wax = flag.String("wax", "", "serve wax with path to its dist folder")
 var serve = flag.String("serve", "", "additional paths to serve")
 
 var tile_content_type string
-var mbt *MBTiles
+var mbt *mbtiles.Map
 
 const tilesize = 256
 
@@ -43,10 +44,10 @@ func main() {
 	}
 
 	var err error
-	mbt, err = OpenMBTiles(flag.Arg(0))
+	mbt, err = mbtiles.Open(flag.Arg(0))
 	chk_fatal(err)
 	defer mbt.Close()
-	mbt.AutoReload()
+	mbt.SetAutoReload(true)
 
 	servezxy("/tiles/", tiler)
 	servezxy("/grids/", gridder)
@@ -100,7 +101,7 @@ func main() {
 
 func tiler(w http.ResponseWriter, req *http.Request, z, x, y int) error {
 	blob, err := mbt.GetTile(z, x, y)
-	if err == ErrTileNotFound && *markmissing {
+	if err == mbtiles.ErrTileNotFound && *markmissing {
 		log.Println("notile", z, x, y)
 		blob, err = nosuchtile("no such tile", z, x, y), nil
 	}
@@ -127,7 +128,7 @@ func zxynotfound(err error, w http.ResponseWriter, req *http.Request) {
 func servezxy(prefix string, f func(w http.ResponseWriter, req *http.Request, z, x, y int) error) {
 	http.Handle(prefix, http.StripPrefix(prefix, http.HandlerFunc(
 		func(w http.ResponseWriter, req *http.Request) {
-			err := ErrTileNotFound
+			err := mbtiles.ErrTileNotFound
 			parts := strings.Split(req.URL.Path, "/")
 			if len(parts) == 3 {
 				n := strings.IndexAny(parts[2], ".")
@@ -149,7 +150,8 @@ func servezxy(prefix string, f func(w http.ResponseWriter, req *http.Request, z,
 				if err == nil {
 					return
 				}
-				if err != ErrTileNotFound {
+				if err != mbtiles.ErrTileNotFound {
+					log.Println(z, x, y, err)
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}

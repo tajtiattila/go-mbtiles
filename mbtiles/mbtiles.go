@@ -1,4 +1,4 @@
-package main
+package mbtiles
 
 import (
 	"bytes"
@@ -14,118 +14,106 @@ import (
 
 var ErrTileNotFound = errors.New("tile does not exist")
 
-type MBTiles struct {
-	Filename string
-	Mtime    time.Time
-	mtx      sync.Mutex
+type mapsql struct {
 	db       *sql.DB
 	tileStmt, gridStmt, gridDataStmt *sql.Stmt
-	done     chan<- bool
+	metadata *Metadata
 }
 
-func OpenMBTiles(dbname string) (*MBTiles, error) {
-	mbt := &MBTiles{Filename: dbname}
-	fi, err := os.Stat(mbt.Filename)
+func (ms *mapsql) open(fn string) (time.Time, error) {
+	fi, err := os.Stat(fn)
+	var tnil time.Time
 	if err != nil {
-		return nil, err
+		return tnil, err
 	}
-	mbt.Mtime = fi.ModTime()
+	mtime := fi.ModTime()
 
 	ok := false
 	defer func() {
 		if !ok {
-			if mbt.tileStmt != nil {
-				mbt.tileStmt.Close()
+			if ms.tileStmt != nil {
+				ms.tileStmt.Close()
 			}
-			if mbt.gridStmt != nil {
-				mbt.gridStmt.Close()
+			if ms.gridStmt != nil {
+				ms.gridStmt.Close()
 			}
-			if mbt.gridDataStmt != nil {
-				mbt.gridDataStmt.Close()
+			if ms.gridDataStmt != nil {
+				ms.gridDataStmt.Close()
 			}
-			if mbt.db != nil {
-				mbt.db.Close()
+			if ms.db != nil {
+				ms.db.Close()
 			}
 		}
 	}()
 
-	mbt.db, err = sql.Open("sqlite3", mbt.Filename)
+	ms.db, err = sql.Open("sqlite3", fn)
 	if err != nil {
-		return nil, err
+		return tnil, err
 	}
-	mbt.tileStmt, err = mbt.db.Prepare(`select tile_data from tiles
+	ms.metadata, err = mbtMetadata(ms.db)
+	if err != nil {
+		return tnil, err
+	}
+	ms.tileStmt, err = ms.db.Prepare(`select tile_data from tiles
 where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
 	if err != nil {
-		return nil, err
+		return tnil, err
 	}
-	mbt.gridStmt, err = mbt.db.Prepare(`select grid from grids
+	ms.gridStmt, err = ms.db.Prepare(`select grid from grids
 where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
 	if err != nil {
-		return nil, err
+		return tnil, err
 	}
-	mbt.gridDataStmt, err = mbt.db.Prepare(`select key_name,key_json from grid_data
+	ms.gridDataStmt, err = ms.db.Prepare(`select key_name,key_json from grid_data
 where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
 	if err != nil {
-		return nil, err
+		return tnil, err
 	}
-
 	ok = true
-	return mbt, nil
+	return mtime, err
 }
 
-func (mbt *MBTiles) Close() error {
-	mbt.mtx.Lock()
-	defer mbt.mtx.Unlock()
-	if mbt.done != nil {
-		mbt.done <- true
-	}
-	mbt.tileStmt.Close()
-	mbt.gridStmt.Close()
-	mbt.gridDataStmt.Close()
-	err := mbt.db.Close()
-	mbt.db = nil
-	mbt.tileStmt = nil
-	mbt.gridStmt = nil
-	mbt.gridDataStmt = nil
+func (ms *mapsql) close() error {
+	ms.tileStmt.Close()
+	ms.gridStmt.Close()
+	ms.gridDataStmt.Close()
+	err := ms.db.Close()
+	ms.db = nil
+	ms.tileStmt = nil
+	ms.gridStmt = nil
+	ms.gridDataStmt = nil
 	return err
 }
 
-func (mbt *MBTiles) AutoReload() {
-	mbt.mtx.Lock()
-	defer mbt.mtx.Unlock()
-	if mbt.done != nil {
-		return
-	}
-	ch := make(chan bool)
-	mbt.done = ch
-
-	go func() {
-		tick := time.Tick(time.Second)
-		for {
-			select {
-			case <-ch:
-				return
-			case <-tick:
-				fi, err := os.Stat(mbt.Filename)
-				if err != nil && fi.ModTime() != mbt.Mtime {
-					mbt.mtx.Lock()
-					// check if we were closed in the meantime
-					if mbt.db != nil {
-						nconn, err := sql.Open("sqlite3", mbt.Filename)
-						if err == nil {
-							mbt.db.Close()
-							mbt.Mtime = fi.ModTime()
-							mbt.db = nconn
-						}
-					}
-					mbt.mtx.Unlock()
-				}
-			}
-		}
-	}()
+type Map struct {
+	mapsql
+	Filename string
+	Mtime    time.Time
+	mtx      sync.Mutex
+	ar     chan<- bool
 }
 
-func (mbt *MBTiles) GetTile(z, x, y int) ([]byte, error) {
+func Open(dbname string) (*Map, error) {
+	mbt := &Map{Filename: dbname}
+	var err error
+	mbt.Mtime, err = mbt.open(mbt.Filename)
+	if err != nil {
+		return nil, err
+	}
+	return mbt, err
+}
+
+func (mbt *Map) Close() error {
+	mbt.mtx.Lock()
+	defer mbt.mtx.Unlock()
+	if mbt.ar != nil {
+		close(mbt.ar)
+		mbt.ar = nil
+	}
+	return mbt.mapsql.close()
+}
+
+func (mbt *Map) GetTile(z, x, y int) ([]byte, error) {
 	mbt.mtx.Lock()
 	defer mbt.mtx.Unlock()
 	rows, err := mbt.tileStmt.Query(z, x, y)
@@ -143,7 +131,7 @@ func (mbt *MBTiles) GetTile(z, x, y int) ([]byte, error) {
 	return nil, err
 }
 
-func (mbt *MBTiles) GetGridData(z, x, y int, callback string) ([]byte, error) {
+func (mbt *Map) GetGridData(z, x, y int, callback string) ([]byte, error) {
 	mbt.mtx.Lock()
 	defer mbt.mtx.Unlock()
 	rows, err := mbt.gridStmt.Query(z, x, y)
@@ -197,8 +185,7 @@ func (mbt *MBTiles) GetGridData(z, x, y int, callback string) ([]byte, error) {
 	return json.Marshal(gd)
 }
 
-func (mbt *MBTiles) Metadata() (*Metadata, error) {
-	mbt.mtx.Lock()
-	defer mbt.mtx.Unlock()
-	return MbtMetadata(mbt.db)
+func (mbt *Map) Metadata() *Metadata {
+	return mbt.metadata
 }
+
