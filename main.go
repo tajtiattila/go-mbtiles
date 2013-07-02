@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
-	"fmt"
+	"log"
 	"net/http"
-	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -14,8 +13,7 @@ import (
 
 func chk_fatal(err error) {
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal()
 	}
 }
 
@@ -38,8 +36,11 @@ const metadata_name = "metadata.json"
 func main() {
 	flag.Parse()
 	if *modestmaps && *leaflet != "" {
-		fmt.Println("options -modestmaps and -leaflet are mutually exclusive")
-		os.Exit(1)
+		log.Fatal("options -modestmaps and -leaflet are mutually exclusive")
+	}
+
+	if len(flag.Args()) != 1 {
+		log.Fatal("exactly one .mbtiles file must be specified")
 	}
 
 	var err error
@@ -84,7 +85,7 @@ func main() {
 				mapping = mapping + "/"
 			}
 			http.Handle(mapping, http.StripPrefix(mapping, http.FileServer(http.Dir(source))))
-			fmt.Printf("serving: %s -> %s\n", mapping, source)
+			log.Printf("serving: %s -> %s\n", mapping, source)
 		}
 	}
 	err = http.ListenAndServe(*addr, nil)
@@ -103,7 +104,7 @@ func tiler(w http.ResponseWriter, req *http.Request) {
 			var err error
 			args[i], err = strconv.Atoi(s)
 			if err != nil {
-				fmt.Println("Bad request", parts)
+				log.Println("Bad request", parts)
 				http.Error(w, "Bad request", http.StatusNotFound)
 				return
 			}
@@ -117,8 +118,8 @@ func tiler(w http.ResponseWriter, req *http.Request) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			fmt.Println("notile", z, x, y)
 			if *markmissing {
+				log.Println("notile", z, x, y)
 				blob = nosuchtile("no such tile", z, x, y)
 			} else {
 				blob = emptytile
@@ -128,6 +129,6 @@ func tiler(w http.ResponseWriter, req *http.Request) {
 		http.ServeContent(w, req, "", mbt.Mtime, content)
 		return
 	}
-	fmt.Println(req.URL.Path)
+	log.Println(req.URL.Path)
 	http.Error(w, req.URL.Path+" not found", http.StatusInternalServerError)
 }
