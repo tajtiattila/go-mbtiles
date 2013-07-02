@@ -22,11 +22,12 @@ func chk_fatal(err error) {
 
 var addr = flag.String("addr", ":10998", "http service address")
 var markmissing = flag.Bool("markmissing", false, "mark missing tiles")
+var debug = flag.Bool("debug", false, "debug index.html")
 var gridderlog = flag.Bool("gridderlog", false, "log UTFGrid accesses")
 
 var modestmaps = flag.Bool("modestmaps", false, "serve modestmaps")
 var leaflet = flag.String("leaflet", "", "serve leaflet with path to its dist folder")
-var wax = flag.String("wax", "", "serve wax with path to its dist folder")
+var wax = flag.Bool("wax", false, "serve wax")
 var serve = flag.String("serve", "", "additional paths to serve")
 
 var tile_content_type string
@@ -63,7 +64,7 @@ func main() {
 	} else if *leaflet != "" {
 		enable_bgimg()
 		enable_leaflet(mbt, *leaflet)
-	} else {
+	} else if *wax {
 		enable_cache("/lib/")
 		http.Handle("/", http.HandlerFunc(
 			func(w http.ResponseWriter, req *http.Request) {
@@ -74,6 +75,12 @@ func main() {
 				} else {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 				}
+			}))
+	} else {
+		tmpl := &MapboxjsTemplate{mbt:mbt, debug:*debug}
+		http.Handle("/", http.HandlerFunc(
+			func(w http.ResponseWriter, req *http.Request) {
+				tmpl.Execute(w)
 			}))
 	}
 
