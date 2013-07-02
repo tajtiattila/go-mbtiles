@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"code.google.com/p/gosqlite/sqlite"
+	"compress/zlib"
+	"encoding/json"
 	"errors"
 	"os"
 	"sync"
@@ -96,6 +99,66 @@ where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
 		}
 	}
 	return nil, err
+}
+
+func (mbt *MBTiles) GetGridData(z, x, y int, callback string) ([]byte, error) {
+	mbt.mtx.Lock()
+	defer mbt.mtx.Unlock()
+	stmt, err := mbt.conn.Prepare(`select grid from grids
+where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
+	if err != nil {
+		return nil, err
+	}
+	if err = stmt.Exec(z, x, y); err != nil {
+		return nil, err
+	}
+	if !stmt.Next() {
+		return nil, ErrTileNotFound
+	}
+	var blob []byte
+	if err = stmt.Scan(&blob); err != nil {
+		return nil, err
+	}
+	zr, err := zlib.NewReader(bytes.NewReader(blob))
+	if err != nil {
+		return nil, err
+	}
+	gd := make(map[string]*json.RawMessage)
+	if err = json.NewDecoder(zr).Decode(&gd); err != nil {
+		return nil, err
+	}
+	stmt, err = mbt.conn.Prepare(`select key_name,key_json from grid_data
+where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
+	if err != nil {
+		return nil, err
+	}
+	if err = stmt.Exec(z, x, y); err != nil {
+		return nil, err
+	}
+	var data bytes.Buffer
+	sep := ""
+	data.WriteString("{")
+	for stmt.Next() {
+		var key_name, key_json string
+		if err = stmt.Scan(&key_name, &key_json); err != nil {
+			break
+		}
+		data.WriteString(sep + `"` + key_name + `":` + key_json)
+		sep = ","
+	}
+	data.WriteString("}")
+	datamsg := json.RawMessage(data.Bytes())
+	gd["data"] = &datamsg
+
+	if callback != "" {
+		var final bytes.Buffer
+		final.WriteString(callback + "(")
+		err = json.NewEncoder(&final).Encode(gd)
+		final.WriteString(");")
+		return final.Bytes(), err
+	}
+
+	return json.Marshal(gd)
 }
 
 func (mbt *MBTiles) Metadata() (*Metadata, error) {
