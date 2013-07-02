@@ -2,10 +2,11 @@ package main
 
 import (
 	"bytes"
-	"code.google.com/p/gosqlite/sqlite"
 	"compress/zlib"
+	"database/sql"
 	"encoding/json"
 	"errors"
+	_ "github.com/mattn/go-sqlite3"
 	"os"
 	"sync"
 	"time"
@@ -17,7 +18,8 @@ type MBTiles struct {
 	Filename string
 	Mtime    time.Time
 	mtx      sync.Mutex
-	conn     *sqlite.Conn
+	db       *sql.DB
+	tileStmt, gridStmt, gridDataStmt *sql.Stmt
 	done     chan<- bool
 }
 
@@ -29,10 +31,45 @@ func OpenMBTiles(dbname string) (*MBTiles, error) {
 	}
 	mbt.Mtime = fi.ModTime()
 
-	mbt.conn, err = sqlite.Open(mbt.Filename)
+	ok := false
+	defer func() {
+		if !ok {
+			if mbt.tileStmt != nil {
+				mbt.tileStmt.Close()
+			}
+			if mbt.gridStmt != nil {
+				mbt.gridStmt.Close()
+			}
+			if mbt.gridDataStmt != nil {
+				mbt.gridDataStmt.Close()
+			}
+			if mbt.db != nil {
+				mbt.db.Close()
+			}
+		}
+	}()
+
+	mbt.db, err = sql.Open("sqlite3", mbt.Filename)
 	if err != nil {
 		return nil, err
 	}
+	mbt.tileStmt, err = mbt.db.Prepare(`select tile_data from tiles
+where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
+	if err != nil {
+		return nil, err
+	}
+	mbt.gridStmt, err = mbt.db.Prepare(`select grid from grids
+where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
+	if err != nil {
+		return nil, err
+	}
+	mbt.gridDataStmt, err = mbt.db.Prepare(`select key_name,key_json from grid_data
+where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
+	if err != nil {
+		return nil, err
+	}
+
+	ok = true
 	return mbt, nil
 }
 
@@ -42,8 +79,14 @@ func (mbt *MBTiles) Close() error {
 	if mbt.done != nil {
 		mbt.done <- true
 	}
-	err := mbt.conn.Close()
-	mbt.conn = nil
+	mbt.tileStmt.Close()
+	mbt.gridStmt.Close()
+	mbt.gridDataStmt.Close()
+	err := mbt.db.Close()
+	mbt.db = nil
+	mbt.tileStmt = nil
+	mbt.gridStmt = nil
+	mbt.gridDataStmt = nil
 	return err
 }
 
@@ -67,12 +110,12 @@ func (mbt *MBTiles) AutoReload() {
 				if err != nil && fi.ModTime() != mbt.Mtime {
 					mbt.mtx.Lock()
 					// check if we were closed in the meantime
-					if mbt.conn != nil {
-						nconn, err := sqlite.Open(mbt.Filename)
+					if mbt.db != nil {
+						nconn, err := sql.Open("sqlite3", mbt.Filename)
 						if err == nil {
-							mbt.conn.Close()
+							mbt.db.Close()
 							mbt.Mtime = fi.ModTime()
-							mbt.conn = nconn
+							mbt.db = nconn
 						}
 					}
 					mbt.mtx.Unlock()
@@ -85,18 +128,17 @@ func (mbt *MBTiles) AutoReload() {
 func (mbt *MBTiles) GetTile(z, x, y int) ([]byte, error) {
 	mbt.mtx.Lock()
 	defer mbt.mtx.Unlock()
-	stmt, err := mbt.conn.Prepare(`select tile_data from tiles
-where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
-	if err == nil {
-		if err = stmt.Exec(z, x, y); err == nil {
-			if !stmt.Next() {
-				return nil, ErrTileNotFound
-			}
-			var blob []byte
-			if err = stmt.Scan(&blob); err == nil {
-				return blob, nil
-			}
-		}
+	rows, err := mbt.tileStmt.Query(z, x, y)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, ErrTileNotFound
+	}
+	var blob []byte
+	if err = rows.Scan(&blob); err == nil {
+		return blob, nil
 	}
 	return nil, err
 }
@@ -104,19 +146,16 @@ where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
 func (mbt *MBTiles) GetGridData(z, x, y int, callback string) ([]byte, error) {
 	mbt.mtx.Lock()
 	defer mbt.mtx.Unlock()
-	stmt, err := mbt.conn.Prepare(`select grid from grids
-where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
+	rows, err := mbt.gridStmt.Query(z, x, y)
 	if err != nil {
 		return nil, err
 	}
-	if err = stmt.Exec(z, x, y); err != nil {
-		return nil, err
-	}
-	if !stmt.Next() {
+	defer rows.Close()
+	if !rows.Next() {
 		return nil, ErrTileNotFound
 	}
 	var blob []byte
-	if err = stmt.Scan(&blob); err != nil {
+	if err = rows.Scan(&blob); err != nil {
 		return nil, err
 	}
 	zr, err := zlib.NewReader(bytes.NewReader(blob))
@@ -127,20 +166,17 @@ where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
 	if err = json.NewDecoder(zr).Decode(&gd); err != nil {
 		return nil, err
 	}
-	stmt, err = mbt.conn.Prepare(`select key_name,key_json from grid_data
-where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
+	rows, err = mbt.gridDataStmt.Query(z, x, y)
 	if err != nil {
 		return nil, err
 	}
-	if err = stmt.Exec(z, x, y); err != nil {
-		return nil, err
-	}
+	defer rows.Close()
 	var data bytes.Buffer
 	sep := ""
 	data.WriteString("{")
-	for stmt.Next() {
+	for rows.Next() {
 		var key_name, key_json string
-		if err = stmt.Scan(&key_name, &key_json); err != nil {
+		if err = rows.Scan(&key_name, &key_json); err != nil {
 			break
 		}
 		data.WriteString(sep + `"` + key_name + `":` + key_json)
@@ -164,5 +200,5 @@ where zoom_level = ?1 and tile_column = ?2 and tile_row = ?3`)
 func (mbt *MBTiles) Metadata() (*Metadata, error) {
 	mbt.mtx.Lock()
 	defer mbt.mtx.Unlock()
-	return MbtMetadata(mbt.conn)
+	return MbtMetadata(mbt.db)
 }

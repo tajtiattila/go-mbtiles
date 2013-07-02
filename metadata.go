@@ -1,7 +1,7 @@
 package main
 
 import (
-	"code.google.com/p/gosqlite/sqlite"
+	"database/sql"
 	"errors"
 	"reflect"
 	"strconv"
@@ -22,20 +22,17 @@ type Metadata struct {
 	Errors                                                    []error
 }
 
-func MbtMetadata(conn *sqlite.Conn) (*Metadata, error) {
-	stmt, err := conn.Prepare("select name,value from metadata")
+func MbtMetadata(db *sql.DB) (*Metadata, error) {
+	rows, err := db.Query("select name,value from metadata")
 	if err != nil {
 		return nil, err
 	}
-	err = stmt.Exec()
-	if err != nil {
-		return nil, err
-	}
+	defer rows.Close()
 
 	md := new(Metadata)
-	for stmt.Next() {
+	for rows.Next() {
 		var name, value string
-		err = stmt.Scan(&name, &value)
+		err = rows.Scan(&name, &value)
 		if err != nil {
 			return nil, err
 		}
