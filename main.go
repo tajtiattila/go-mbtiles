@@ -63,10 +63,10 @@ func main() {
 		}))
 	if *modestmaps {
 		enable_bgimg()
-		enable_modestmaps()
+		enable_modestmaps(mbt)
 	} else if *leaflet != "" {
 		enable_bgimg()
-		enable_leaflet(*leaflet)
+		enable_leaflet(mbt, *leaflet)
 	}
 
 	if *serve != "" {

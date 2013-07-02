@@ -11,7 +11,7 @@ type leafletparams struct {
 	Leaflet string
 }
 
-func enable_leaflet(libpath string) error {
+func enable_leaflet(mbtiles *MBTiles, libpath string) error {
 	leaflettmpl, err := template.New("leaflettmpl").Parse(leaflettext)
 	if err != nil {
 		return err
@@ -29,7 +29,7 @@ func enable_leaflet(libpath string) error {
 	}
 	http.Handle("/", http.HandlerFunc(
 		func(w http.ResponseWriter, req *http.Request) {
-			metadata, err := mbt.Metadata()
+			metadata, err := mbtiles.Metadata()
 			if err != nil {
 				http.Error(w, "metadata query error: "+err.Error(), 500)
 				return

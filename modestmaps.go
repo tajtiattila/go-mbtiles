@@ -8,14 +8,14 @@ import (
 	"net/http"
 )
 
-func enable_modestmaps() error {
+func enable_modestmaps(mbtiles *MBTiles) error {
 	mmtmpl, err := template.New("mmtmpl").Parse(mmtext)
 	if err != nil {
 		return err
 	}
 	http.Handle("/", http.HandlerFunc(
 		func(w http.ResponseWriter, req *http.Request) {
-			metadata, err := mbt.Metadata()
+			metadata, err := mbtiles.Metadata()
 			if err != nil {
 				http.Error(w, "metadata query error: "+err.Error(), 500)
 				return
