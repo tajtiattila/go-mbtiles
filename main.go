@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -23,6 +24,7 @@ var markmissing = flag.Bool("markmissing", false, "mark missing tiles")
 
 var modestmaps = flag.Bool("modestmaps", false, "serve modestmaps")
 var leaflet = flag.String("leaflet", "", "serve leaflet with path to its dist folder")
+var wax = flag.String("wax", "", "serve wax with path to its dist folder")
 var serve = flag.String("serve", "", "additional paths to serve")
 
 var tile_content_type string
@@ -59,6 +61,18 @@ func main() {
 	} else if *leaflet != "" {
 		enable_bgimg()
 		enable_leaflet(mbt, *leaflet)
+	} else {
+		enable_cache("/lib/")
+		http.Handle("/", http.HandlerFunc(
+			func(w http.ResponseWriter, req *http.Request) {
+				fn := "index.html"
+				rs, err := os.Open(fn)
+				if err == nil {
+					http.ServeContent(w, req, fn, time.Time{}, rs)
+				} else {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
+			}))
 	}
 
 	if *serve != "" {
