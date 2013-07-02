@@ -6,6 +6,7 @@ import (
 	"html"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
 
 type MapboxjsTemplate struct {
@@ -15,7 +16,7 @@ type MapboxjsTemplate struct {
 	data []byte
 }
 
-func (m *MapboxjsTemplate) Execute(w http.ResponseWriter) {
+func (m *MapboxjsTemplate) Execute(w http.ResponseWriter, r *http.Request) {
 	n := m.mbt.Metadata().Name
 	if n == "" {
 		n = "MBTileSrv"
@@ -39,8 +40,8 @@ func (m *MapboxjsTemplate) Execute(w http.ResponseWriter) {
 			txt = c
 		}
 		m.data = txt
-		w.Write(m.data)
 	}
+	http.ServeContent(w, r, "index.html", time.Time{}, bytes.NewReader(m.data))
 }
 
 var mapboxjstext = []byte(`<html>
@@ -55,15 +56,16 @@ var mapboxjstext = []byte(`<html>
 	<style>
 		body { margin:0; }
 		#map {
-		width:100%;
-		height:100%;
+			width:100%;
+			height:100%;
+			background:#eee url(./images/bg.png);
 		}
 	</style>
 </head>
 <body>
 	<div id='map' class='dark'></div>
 	<script type='text/javascript'>
-		var map = L.mapbox.map('map', '/map.json');
+		var map = L.mapbox.map('map', './map.json');
 		map.gridControl.options.follow = true;
 		L.control.scale().addTo(map);
 	</script>

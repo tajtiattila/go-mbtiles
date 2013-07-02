@@ -55,7 +55,7 @@ var leaflettext = `<html>
 					center: new L.LatLng({{.M.Center.Lon}}, {{.M.Center.Lat}}),
 					zoom: {{.M.Center.Zoom}}
 				});
-				var tmpl = '/tiles/{z}/{x}/{y}.png';
+				var tmpl = './tiles/{z}/{x}/{y}.png';
 				var layer = new L.TileLayer(tmpl, {
 					minZoom: {{.M.MinZoom}},
 					maxZoom: {{.M.MaxZoom}}
@@ -68,7 +68,7 @@ var leaflettext = `<html>
 		<style>
 			body {margin: 0; }
 			#map { width: 100%; height:100%;
-				background:#eee url(/images/bg.png);
+				background:#eee url(./images/bg.png);
 			}
 		</style>
 	</head>

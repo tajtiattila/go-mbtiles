@@ -6,7 +6,9 @@ import (
 	"github.com/tajtiattila/go-mbtiles/mbtiles"
 	"io"
 	"log"
+	"net"
 	"net/http"
+	"net/http/fcgi"
 	"os"
 	"path"
 	"strconv"
@@ -21,10 +23,12 @@ func chk_fatal(err error) {
 }
 
 var addr = flag.String("addr", ":10998", "http service address")
+var prefix = flag.String("prefix", "", "http path prefix")
 var markmissing = flag.Bool("markmissing", false, "mark missing tiles")
 var debug = flag.Bool("debug", false, "debug index.html")
 var gridderlog = flag.Bool("gridderlog", false, "log UTFGrid accesses")
 
+var dofcgi = flag.Bool("fcgi", false, "fastcgi mode")
 var modestmaps = flag.Bool("modestmaps", false, "serve modestmaps")
 var leaflet = flag.String("leaflet", "", "serve leaflet with path to its dist folder")
 var wax = flag.Bool("wax", false, "serve wax")
@@ -51,18 +55,18 @@ func main() {
 	defer mbt.Close()
 	mbt.SetAutoReload(true)
 
+	enable_bgimg()
+
 	servezxy("/tiles/", tiler)
 	servezxy("/grids/", gridder)
-	servefn("/map.json", "", func(req *http.Request) (io.ReadSeeker, error) {
+	servefn("/map.json", "", func(req *http.Request) (io.ReadSeeker, time.Time, error) {
 		return TileJson(mbt, "") })
-	servefn("/map.jsonp", "text/javascript", func(req *http.Request) (io.ReadSeeker, error) {
+	servefn("/map.jsonp", "text/javascript", func(req *http.Request) (io.ReadSeeker, time.Time, error) {
 		return TileJson(mbt, req.URL.Query().Get("callback")) })
 
 	if *modestmaps {
-		enable_bgimg()
 		enable_modestmaps(mbt)
 	} else if *leaflet != "" {
-		enable_bgimg()
 		enable_leaflet(mbt, *leaflet)
 	} else if *wax {
 		enable_cache("/lib/")
@@ -80,7 +84,7 @@ func main() {
 		tmpl := &MapboxjsTemplate{mbt:mbt, debug:*debug}
 		http.Handle("/", http.HandlerFunc(
 			func(w http.ResponseWriter, req *http.Request) {
-				tmpl.Execute(w)
+				tmpl.Execute(w, req)
 			}))
 	}
 
@@ -103,8 +107,39 @@ func main() {
 			log.Printf("serving: %s -> %s\n", mapping, source)
 		}
 	}
-	err = http.ListenAndServe(*addr, nil)
+	h := http.Handler(http.DefaultServeMux)
+	if *prefix != "" {
+		pfx := strings.TrimRight(*prefix, "/")
+		if pfx[0] != '/' {
+			pfx = "/" + pfx
+		}
+		h = stripPrefix(pfx, h)
+	}
+	if *dofcgi {
+		l, err := net.Listen("tcp", *addr)
+		if err == nil {
+			err = fcgi.Serve(l, h)
+		}
+	} else {
+		err = http.ListenAndServe(*addr, h)
+	}
 	chk_fatal(err)
+}
+
+func stripPrefix(prefix string, h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, prefix) {
+			http.NotFound(w, r)
+			return
+		}
+		r.URL.Path = r.URL.Path[len(prefix):]
+		if r.URL.Path == "" {
+			r.URL.Path = prefix + "/"
+			http.Redirect(w, r, r.URL.String(), http.StatusMovedPermanently)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
 }
 
 func tiler(w http.ResponseWriter, req *http.Request, z, x, y int) error {
@@ -125,7 +160,7 @@ func gridder(w http.ResponseWriter, req *http.Request, z, x, y int) error {
 	}
 	blob, err := mbt.GetGridData(z, x, y, req.URL.Query().Get("callback"))
 	if err == nil {
-		http.ServeContent(w, req, "grid.js", time.Time{}, bytes.NewReader(blob))
+		http.ServeContent(w, req, "grid.js", mbt.Mtime, bytes.NewReader(blob))
 	}
 	return err
 }
@@ -170,15 +205,15 @@ func servezxy(prefix string, f func(w http.ResponseWriter, req *http.Request, z,
 		})))
 }
 
-func servefn(pth string, ctyp string, f func(req *http.Request) (io.ReadSeeker, error)) {
+func servefn(pth string, ctyp string, f func(req *http.Request) (io.ReadSeeker, time.Time, error)) {
 	http.Handle(pth, http.HandlerFunc(
 		func(w http.ResponseWriter, req *http.Request) {
-			rs, err := f(req)
+			rs, t, err := f(req)
 			if ctyp != "" {
 				w.Header().Set("Content-Type", ctyp)
 			}
 			if err == nil {
-				http.ServeContent(w, req, pth, time.Time{}, rs)
+				http.ServeContent(w, req, pth, t, rs)
 			} else {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
