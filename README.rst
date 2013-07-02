@@ -28,8 +28,7 @@ External dependencies
 
 Mbtilesrv depends on go-sqlite3_ and freetype-go_. Install them with go get::
 
-	go get github.com/mattn/go-sqlite3
-    go get code.google.com/p/gosqlite
+    go get github.com/mattn/go-sqlite3
     go get code.google.com/p/freetype-go
 
 Todo
@@ -39,5 +38,5 @@ Todo
 - Search?
 
 
-.. _go-sqlite3: github.com/mattn/go-sqlite3
+.. _go-sqlite3: http://github.com/mattn/go-sqlite3
 .. _freetype-go: http://code.google.com/p/freetype-go/
