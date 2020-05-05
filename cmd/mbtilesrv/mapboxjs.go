@@ -10,10 +10,10 @@ import (
 )
 
 type MapboxjsTemplate struct {
-	mbt *mbtiles.Map
-	debug bool
+	mbt         *mbtiles.Map
+	debug       bool
 	cachedtitle string
-	data []byte
+	data        []byte
 }
 
 func (m *MapboxjsTemplate) Execute(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +33,7 @@ func (m *MapboxjsTemplate) Execute(w http.ResponseWriter, r *http.Request) {
 		const sep1, sep2 = "<title>", "</title>"
 		t1, t2 := bytes.Index(txt, []byte(sep1)), bytes.Index(txt, []byte(sep2))
 		if t1 > 0 && t2 > 0 && bytes.IndexByte(txt[t1:t2], '<') < 0 {
-			c := make([]byte, 0, len(txt) + len(n))
+			c := make([]byte, 0, len(txt)+len(n))
 			c = append(c, txt[:t1+len(sep1)]...)
 			c = append(c, html.EscapeString(n)...)
 			c = append(c, txt[t2:]...)
@@ -47,11 +47,11 @@ func (m *MapboxjsTemplate) Execute(w http.ResponseWriter, r *http.Request) {
 var mapboxjstext = []byte(`<html>
 <head>
 	<title>MBTileSrv</title>
-	<link href='http://api.tiles.mapbox.com/mapbox.js/v1.1.0/mapbox.css' rel='stylesheet' />
+	<link href='//api.tiles.mapbox.com/mapbox.js/v1.1.0/mapbox.css' rel='stylesheet' />
 	<!--[if lte IE 8]>
-		<link href='http://api.tiles.mapbox.com/mapbox.js/v1.1.0/mapbox.ie.css' rel='stylesheet' />
+		<link href='//api.tiles.mapbox.com/mapbox.js/v1.1.0/mapbox.ie.css' rel='stylesheet' />
 	<![endif]-->
-	<script src='http://api.tiles.mapbox.com/mapbox.js/v1.1.0/mapbox.js'></script>
+	<script src='//api.tiles.mapbox.com/mapbox.js/v1.1.0/mapbox.js'></script>
 
 	<style>
 		body { margin:0; }

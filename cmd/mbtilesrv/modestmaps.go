@@ -29,7 +29,7 @@ var mmtext = `<html>
 	<head>
 		<title>{{.Name}}</title>
 		<script type="text/javascript"
-			src="https://raw.github.com/stamen/modestmaps-js/master/modestmaps.min.js"></script>
+			src="//raw.github.com/stamen/modestmaps-js/master/modestmaps.min.js"></script>
 		<script type="text/javascript">
 			var MM = com.modestmaps;
 			var map;
