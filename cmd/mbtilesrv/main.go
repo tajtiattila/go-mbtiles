@@ -60,9 +60,11 @@ func main() {
 	servezxy("/tiles/", tiler)
 	servezxy("/grids/", gridder)
 	servefn("/map.json", "", func(req *http.Request) (io.ReadSeeker, time.Time, error) {
-		return TileJson(mbt, "") })
+		return TileJson(mbt, "")
+	})
 	servefn("/map.jsonp", "text/javascript", func(req *http.Request) (io.ReadSeeker, time.Time, error) {
-		return TileJson(mbt, req.URL.Query().Get("callback")) })
+		return TileJson(mbt, req.URL.Query().Get("callback"))
+	})
 
 	if *modestmaps {
 		enable_modestmaps(mbt)
@@ -81,7 +83,7 @@ func main() {
 				}
 			}))
 	} else {
-		tmpl := &MapboxjsTemplate{mbt:mbt, debug:*debug}
+		tmpl := &MapboxjsTemplate{mbt: mbt, debug: *debug}
 		http.Handle("/", http.HandlerFunc(
 			func(w http.ResponseWriter, req *http.Request) {
 				tmpl.Execute(w, req)
@@ -219,4 +221,3 @@ func servefn(pth string, ctyp string, f func(req *http.Request) (io.ReadSeeker, 
 			}
 		}))
 }
-

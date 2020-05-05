@@ -9,16 +9,16 @@ import (
 )
 
 type MapData struct {
-	TileJson string `json:"tilejson"`
-	Name string `json:"name"`
-	MinZoom int `json:"minzoom"`
-	MaxZoom int `json:"maxzoom"`
-	Bounds []float64 `json:"bounds"`
-	Center []float64 `json:"center"`
-	Tiles []string `json:"tiles"`
-	Grids []string `json:"grids"`
-	Template string `json:"template"`
-	Legend string `json:"legend"`
+	TileJson string    `json:"tilejson"`
+	Name     string    `json:"name"`
+	MinZoom  int       `json:"minzoom"`
+	MaxZoom  int       `json:"maxzoom"`
+	Bounds   []float64 `json:"bounds"`
+	Center   []float64 `json:"center"`
+	Tiles    []string  `json:"tiles"`
+	Grids    []string  `json:"grids"`
+	Template string    `json:"template"`
+	Legend   string    `json:"legend"`
 }
 
 func TileJson(mbt *mbtiles.Map, callback string) (io.ReadSeeker, time.Time, error) {

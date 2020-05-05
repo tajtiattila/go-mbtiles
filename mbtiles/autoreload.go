@@ -49,4 +49,3 @@ func (mbt *Map) SetAutoReload(autoreload bool) {
 		}
 	}()
 }
-

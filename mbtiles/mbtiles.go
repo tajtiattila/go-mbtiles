@@ -15,9 +15,9 @@ import (
 var ErrTileNotFound = errors.New("tile does not exist")
 
 type mapsql struct {
-	db       *sql.DB
+	db                               *sql.DB
 	tileStmt, gridStmt, gridDataStmt *sql.Stmt
-	metadata *Metadata
+	metadata                         *Metadata
 }
 
 func (ms *mapsql) open(fn string) (time.Time, error) {
@@ -90,7 +90,7 @@ type Map struct {
 	Filename string
 	Mtime    time.Time
 	mtx      sync.Mutex
-	ar     chan<- bool
+	ar       chan<- bool
 }
 
 func Open(dbname string) (*Map, error) {
@@ -188,4 +188,3 @@ func (mbt *Map) GetGridData(z, x, y int, callback string) ([]byte, error) {
 func (mbt *Map) Metadata() *Metadata {
 	return mbt.metadata
 }
-

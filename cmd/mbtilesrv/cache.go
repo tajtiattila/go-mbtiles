@@ -12,14 +12,13 @@ import (
 )
 
 type cacheitem struct {
-	url      string
-	data     []byte
-	mtime    time.Time
-	err      error // fetch error
+	url   string
+	data  []byte
+	mtime time.Time
+	err   error // fetch error
 }
 
 var cache map[string]*cacheitem
-
 
 func init() {
 	paths := []string{
@@ -33,7 +32,7 @@ func init() {
 	}
 	cache = make(map[string]*cacheitem)
 	for _, u := range paths {
-		cache[path.Base(u)] = &cacheitem{url:u}
+		cache[path.Base(u)] = &cacheitem{url: u}
 	}
 }
 
@@ -48,7 +47,7 @@ func trycachedir(base string, e ...string) string {
 }
 
 const (
-	cachename  = "info.tajti.mbtilesrv"
+	cachename = "info.tajti.mbtilesrv"
 )
 
 type cachedir struct {
@@ -56,6 +55,7 @@ type cachedir struct {
 	path string
 	full bool
 }
+
 var vcachedir = []cachedir{
 	{"HOME", "Library/Caches", true},
 	{"HOME", ".cache", false},
@@ -175,4 +175,3 @@ func serve_cached(w http.ResponseWriter, req *http.Request) {
 func enable_cache(pth string) {
 	http.Handle(pth, http.StripPrefix(pth, http.HandlerFunc(serve_cached)))
 }
-
